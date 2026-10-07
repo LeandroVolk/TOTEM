@@ -46,7 +46,9 @@ class RuntimeV2:
     def iniciar_sessao(self):
         with self._lock:
             if self._session_id is None:
-                self._session_id = self.repositorio.criar_sessao(self.conteudo)
+                self._session_id = self._tentar(
+                    "criar sessao", self.repositorio.criar_sessao, self.conteudo
+                )
             session_id = self._session_id
         self.evento("interaction.started", session_id=session_id)
         return session_id
@@ -58,11 +60,11 @@ class RuntimeV2:
         if session_id is None:
             return
         self.evento(f"interaction.{status}", payload or {}, session_id=session_id)
-        self.repositorio.encerrar_sessao(session_id, status)
+        self._tentar("encerrar sessao", self.repositorio.encerrar_sessao, session_id, status)
 
     def tema_selecionado(self, theme_id, numero):
         if self._session_id:
-            self.repositorio.definir_tema(self._session_id, theme_id)
+            self._tentar("registrar tema", self.repositorio.definir_tema, self._session_id, theme_id)
         self.evento("theme.selected", {"theme_id": theme_id, "answer_id": str(numero)})
 
     def pergunta_exibida(self, question_id, theme_id):
@@ -70,7 +72,7 @@ class RuntimeV2:
 
     def resposta_registrada(self, question_id, numero, tempo_segundos, correta):
         if self._session_id:
-            self.repositorio.incrementar_respostas(self._session_id)
+            self._tentar("registrar resposta", self.repositorio.incrementar_respostas, self._session_id)
         self.evento(
             "question.answered",
             {
@@ -83,7 +85,10 @@ class RuntimeV2:
 
     def evento(self, event_type, payload=None, session_id=None):
         session_id = self._session_id if session_id is None else session_id
-        self.repositorio.registrar_evento("runtime", event_type, payload, session_id)
+        self._tentar(
+            "registrar evento", self.repositorio.registrar_evento,
+            "runtime", event_type, payload, session_id,
+        )
         with self._lock:
             self._last_event = event_type
 
@@ -92,7 +97,7 @@ class RuntimeV2:
             if self._session_id is not None:
                 return {"ok": False, "reason": "active_session"}
             self.conteudo = self.bundles.carregar_ativo()
-            self.repositorio.registrar_publicacao(self.conteudo, status="active")
+            self._tentar("registrar conteudo ativo", self.repositorio.registrar_publicacao, self.conteudo, "active")
         self.evento("content.reloaded", {"bundle": self.conteudo.bundle_id, "version": self.conteudo.version})
         return {"ok": True, "content": self.descricao_conteudo()}
 
@@ -117,6 +122,15 @@ class RuntimeV2:
                 "uptime_seconds": round(monotonic() - self._inicio, 1),
                 "last_event": self._last_event,
             }
+
+    @staticmethod
+    def _tentar(operacao, funcao, *args):
+        try:
+            return funcao(*args)
+        except Exception as erro:
+            # Persistencia e observabilidade nunca podem tomar a camera ou o HDMI.
+            print(f"[v2] nao foi possivel {operacao}: {erro}")
+            return None
 
 
 class RuntimeV2Nulo:
