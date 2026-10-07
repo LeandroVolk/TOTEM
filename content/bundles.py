@@ -117,6 +117,7 @@ class GerenciadorBundles:
     def ativar(self, nome_bundle: str):
         destino = self.bundles_dir / nome_bundle
         self.validar(destino)
+        self._validar_capacidade_runtime(destino)
         temporario = self.root / f".current-{uuid4().hex}"
         relativo = os.path.relpath(destino, self.root)
         temporario.symlink_to(relativo, target_is_directory=True)
@@ -164,6 +165,26 @@ class GerenciadorBundles:
                 quantidade = len(pergunta.get("alternativas", {}))
                 if not 1 <= quantidade <= 5:
                     raise BundleInvalido("Cada pergunta deve ter entre 1 e 5 alternativas.")
+
+    @staticmethod
+    def _validar_capacidade_runtime(bundle_path):
+        """A V1 publica apenas cartoes e gestos 1/2; nao ativa conteudo inalcançavel."""
+        experiencia = json.loads(
+            (Path(bundle_path) / "catalog" / "experience.json").read_text(encoding="utf-8")
+        )
+        etapas = [experiencia["escolha_tema"]]
+        etapas.extend(
+            pergunta
+            for tema in experiencia["temas"].values()
+            for pergunta in tema.get("perguntas", [])
+        )
+        for etapa in etapas:
+            opcoes = {int(numero) for numero in etapa.get("alternativas", {})}
+            if opcoes != {1, 2}:
+                raise BundleInvalido(
+                    "O runtime atual so pode ativar alternativas 1 e 2; "
+                    "o bundle foi preservado para uma capacidade futura."
+                )
 
     @staticmethod
     def _escrever_bundle(destino, bundle_id, version, experiencia, parent_bundle, name):

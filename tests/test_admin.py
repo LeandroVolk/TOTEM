@@ -34,3 +34,14 @@ def test_endpoints_admin_com_token(tmp_path):
     assert client.post("/api/kiosk/restart", headers=headers).status_code == 200
     assert controller.actions == ["restart"]
     assert client.get("/api/content/bundles", headers=headers).status_code == 200
+
+    draft = client.post("/api/content/drafts", headers=headers).json()["draft"]
+    assert client.post(f"/api/content/drafts/{draft}/validate", headers=headers).status_code == 200
+    assert client.get(f"/api/content/drafts/{draft}/preview", headers=headers).status_code == 200
+    publish = client.post(
+        f"/api/content/drafts/{draft}/publish", params={"version": "0.2.0"}, headers=headers
+    )
+    assert publish.status_code == 200
+    assert client.post(
+        "/api/content/bundles/labeco-pampa-0.2.0/activate", headers=headers
+    ).status_code == 200

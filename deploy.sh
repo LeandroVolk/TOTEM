@@ -44,6 +44,9 @@ rsync -avz --delete ${DRY_RUN} \
   -e "ssh -p ${SSH_PORT}" \
   --exclude ".venv*/" \
   --exclude "Arte_e_Ciencia-port1.mp4" \
+  --exclude "runtime/" \
+  --exclude "logs/" \
+  --exclude "tmp/" \
   --exclude "__pycache__/" \
   --exclude "*.pyc" \
   --exclude ".git/" \

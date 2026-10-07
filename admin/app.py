@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -113,6 +114,17 @@ def create_app(servicos=None, token=ADMIN_TOKEN):
             raise HTTPException(status_code=422, detail=str(erro)) from erro
         servicos.repositorio.registrar_evento("admin", "content.validated", {"draft": draft})
         return resultado
+
+    @app.get("/api/content/drafts/{draft}/preview", dependencies=[Depends(autorizado)])
+    def preview_draft(draft: str):
+        caminho = _draft_path(servicos, draft)
+        try:
+            validado = servicos.bundles.validar(caminho)
+            experiencia = (caminho / "catalog" / "experience.json").read_text(encoding="utf-8")
+        except BundleInvalido as erro:
+            raise HTTPException(status_code=422, detail=str(erro)) from erro
+        servicos.repositorio.registrar_evento("admin", "content.previewed", {"draft": draft})
+        return {"manifest": validado["manifest"], "experience": json.loads(experiencia)}
 
     @app.post("/api/content/drafts/{draft}/publish", dependencies=[Depends(autorizado)])
     def publish_draft(draft: str, version: str):
