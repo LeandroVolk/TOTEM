@@ -1,0 +1,1 @@
+__USER__ ALL=(root) NOPASSWD: /usr/local/sbin/totem-kiosk-control start, /usr/local/sbin/totem-kiosk-control stop, /usr/local/sbin/totem-kiosk-control restart

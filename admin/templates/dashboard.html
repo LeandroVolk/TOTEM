@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Totem LABECO</title><link rel="stylesheet" href="/static/admin.css"></head>
+<body>
+<main>
+  <header><img src="/logo" alt="Embrapa"><div><p>LABECO</p><h1>Administração do Totem</h1></div></header>
+  <p id="aviso" class="aviso">{% if not auth_configured %}Autenticação não configurada: mantenha o Admin apenas em loopback ou LAN confiável.{% endif %}</p>
+  <section class="grid" id="status"><article><h2>Totem</h2><strong>Carregando</strong></article></section>
+  <section><h2>Hoje</h2><div class="grid" id="metricas"></div></section>
+  <section><h2>Operação</h2><div class="acoes"><button data-action="start">Iniciar</button><button data-action="stop">Parar</button><button data-action="restart">Reiniciar</button></div></section>
+  <section><h2>Conteúdo</h2><p id="conteudo">Carregando bundles…</p></section>
+</main><script src="/static/dashboard.js"></script>
+</body></html>

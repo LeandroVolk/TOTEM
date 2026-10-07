@@ -1,0 +1,20 @@
+[Unit]
+Description=Totem LABECO kiosk publico
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__PROJECT_DIR__
+StateDirectory=totem-labeco
+Environment=TOTEM_RUNTIME_DIR=/var/lib/totem-labeco
+Environment=TOTEM_CONTROL_SOCKET=/var/lib/totem-labeco/control.sock
+Environment=PYTHONUNBUFFERED=1
+SupplementaryGroups=video render input tty
+ExecStart=__PROJECT_DIR__/run_totem.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

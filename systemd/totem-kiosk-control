@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  start|stop|restart) exec /usr/bin/systemctl "$1" totem-kiosk.service ;;
+  *) echo "Uso: totem-kiosk-control {start|stop|restart}" >&2; exit 2 ;;
+esac
