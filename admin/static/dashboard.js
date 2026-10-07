@@ -1,6 +1,6 @@
-const token = sessionStorage.getItem("totem-admin-token") || "";
-const headers = token ? {"X-Admin-Token": token} : {};
-const get = async (url) => { const r = await fetch(url,{headers}); if(!r.ok) throw new Error("Dados indisponíveis"); return r.json(); };
+let token = sessionStorage.getItem("totem-admin-token") || "";
+const headers = () => token ? {"X-Admin-Token": token} : {};
+const get = async (url) => { const r = await fetch(url,{headers:headers()}); if(!r.ok) throw new Error("Dados indisponíveis"); return r.json(); };
 const text = (v) => v === null || v === undefined ? "indisponível" : String(v);
 async function refresh(){
   try {
@@ -11,5 +11,7 @@ async function refresh(){
     document.querySelector("#conteudo").textContent=bundles.map(b=>`${b.bundle_id} ${b.version}${b.active?" (ativo)":""}`).join(" · ") || "Nenhum bundle publicado.";
   } catch(e) { document.querySelector("#aviso").textContent=e.message; }
 }
-document.querySelectorAll("button[data-action]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm(`Confirma ${button.textContent.toLowerCase()} o Totem?`))return;const r=await fetch(`/api/kiosk/${button.dataset.action}`,{method:"POST",headers});if(!r.ok)alert("Ação não disponível.");refresh();}));
+document.querySelectorAll("button[data-action]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm(`Confirma ${button.textContent.toLowerCase()} o Totem?`))return;const r=await fetch(`/api/kiosk/${button.dataset.action}`,{method:"POST",headers:headers()});if(!r.ok)alert("Ação não disponível.");refresh();}));
+const input=document.querySelector("#token");
+if(input){input.value=token;document.querySelector("#entrar").addEventListener("click",()=>{token=input.value;sessionStorage.setItem("totem-admin-token",token);refresh();});}
 refresh();setInterval(refresh,10000);
