@@ -4,6 +4,29 @@ Protótipo local para um totem sem toque e sem voz em Raspberry Pi 5. A experiê
 
 `pessoa detectada -> joinha -> escolha do tema -> 3 perguntas -> feedbacks -> encerramento -> atracao`.
 
+## Arquitetura V2
+
+O baseline funcional da V1 está marcado pela tag Git `v1-functional`. O desenvolvimento da plataforma ocorre na branch `v2-admin-architecture`; a V1 continua sendo o fallback de conteúdo e o mesmo fluxo público de câmera, MediaPipe, Pygame e KMSDRM permanece proprietário do hardware.
+
+```text
+camera + HDMI
+     |
+totem.py (runtime publico) ---- Unix socket ---- admin FastAPI
+     |                                                    |
+SQLite: sessoes, eventos, metricas                 dashboard e operacao
+     |
+content/current -> content/bundles/<versao>         draft -> validate -> preview
+                                                     -> publish -> activate/rollback
+```
+
+- O Runtime funciona sem o Admin ou rede; ele carrega conteúdo ativo uma vez e mantém a experiência.
+- O Admin não importa Pygame, não abre a câmera e só conversa com o Runtime pelo socket Unix local.
+- SQLite guarda fatos cronológicos e sessões, nunca imagens ou vídeo. Métricas são calculadas a partir desses fatos.
+- O primeiro bundle `labeco-pampa 0.1.0` é criado a partir de `roteiro.py`. Se um bundle falhar, o adaptador legado preserva o roteiro V1.
+- O modelo editorial aceita de 1 a 5 alternativas, mas a ativação V2 atual bloqueia conteúdo diferente de `1` e `2`: os gestos e cartões públicos ainda têm essa capacidade física.
+
+As decisões e operações V2 estão detalhadas em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/CONTENT.md](docs/CONTENT.md), [docs/EVENTS.md](docs/EVENTS.md), [docs/ADMIN.md](docs/ADMIN.md) e [docs/DEPLOY_RPI5.md](docs/DEPLOY_RPI5.md).
+
 ## Estrutura
 
 ```text
@@ -167,6 +190,8 @@ PI_HOST=10.163.4.35 ./deploy.sh --apply
 
 O script exclui virtualenvs (`.venv/`, `.venv-kms/` e semelhantes), `__pycache__/`, `.git/` e caches locais. O ambiente virtual e as dependências Python devem existir no Raspberry.
 
+Na V2, `runtime/`, `logs/` e `tmp/` também são excluídos do deploy: o estado mutável fica fora do checkout quando executado pelo systemd, em `/var/lib/totem-labeco`.
+
 Quando houver um `python3-pygame` instalado pelo sistema, a interface grafica o prioriza apenas para Pygame/SDL. MediaPipe e NumPy continuam sendo carregados da `.venv` do projeto. Isso permite usar o backend KMSDRM do sistema sem duplicar o ambiente virtual.
 
 ## Diagnostico de video
@@ -248,3 +273,13 @@ Se o reconhecimento de gestos ficar sensível demais ou lento demais no Raspberr
 - `HAND_MIN_DETECTION_CONFIDENCE`
 - `HAND_MIN_PRESENCE_CONFIDENCE`
 - `FPS`
+
+## V2: testes locais
+
+Os testes V2 não usam câmera, HDMI ou MediaPipe físico:
+
+```bash
+pytest -q
+```
+
+Eles cobrem SQLite, sessões, Event Log, métricas, bundles, ativação/rollback, IPC e endpoints FastAPI. A instalação e os comandos de operação do Raspberry estão em [docs/DEPLOY_RPI5.md](docs/DEPLOY_RPI5.md).
