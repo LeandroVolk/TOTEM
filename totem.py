@@ -25,10 +25,12 @@ from config import (
 )
 from dialogo import DialogoPygame
 from gestos import GestosDetector
+from ipc.control import ControlServer
 from pessoa import PessoaDetector
-from roteiro import ENCERRAMENTO, ESCOLHA_TEMA, SAUDACAO, feedback_da_resposta, tema_por_numero
+from runtime_v2 import RuntimeV2, RuntimeV2Nulo
 from tela_atracao import TelaAtracao
 from tela_pygame import TelaPygame
+from v2_config import CONTROL_SOCKET_PATH
 
 
 class Estado(Enum):
@@ -221,11 +223,22 @@ def main():
     inicio_feedback = None
     inicio_encerramento = None
     inicio_confirmacao_joinha = None
+    runtime_v2 = RuntimeV2Nulo()
+    control_server = None
+    conteudo = runtime_v2.conteudo
 
     try:
+        try:
+            runtime_v2 = RuntimeV2()
+            control_server = ControlServer(CONTROL_SOCKET_PATH, runtime_v2)
+            control_server.start()
+        except Exception as erro:
+            print(f"[v2] persistencia indisponivel; seguindo com V1: {erro}")
+        conteudo = runtime_v2.conteudo
         gestos = GestosDetector()
         pessoa = PessoaDetector()
         camera = FfmpegCamera(CAMERA_DEVICE, WIDTH, HEIGHT, FPS).start()
+        runtime_v2.pronto(camera_ok=True, mediapipe_ok=True)
 
         registrar_evento(
             "totem_iniciado",
@@ -256,6 +269,7 @@ def main():
                 )
             numero_frame += 1
             agora = time.monotonic()
+            runtime_v2.atualizar_estado(estado.name)
 
             if estado != Estado.ESPERA and pessoa_estado["saiu"]:
                 duracao = 0.0 if inicio_interacao is None else agora - inicio_interacao
@@ -263,6 +277,9 @@ def main():
                     "abandono_interacao",
                     sem_pose_segundos=ABANDONO_SEGUNDOS,
                     duracao_segundos=round(duracao, 1),
+                )
+                runtime_v2.encerrar_sessao(
+                    "abandoned", {"duration_seconds": round(duracao, 1)}
                 )
                 estado = Estado.ESPERA
                 controle = novo_controle_gestos()
@@ -275,6 +292,8 @@ def main():
                 continue
 
             if estado == Estado.ESPERA:
+                # O Control Plane so recarrega conteudo fora de uma sessao ativa.
+                conteudo = runtime_v2.conteudo
                 atracao.mostrar()
                 if pessoa_estado["entrou"] or pessoa_estado["presente"]:
                     estado = Estado.SAUDACAO
@@ -282,11 +301,13 @@ def main():
                     controle = novo_controle_gestos()
                     atracao.ocultar()
                     registrar_evento("pessoa_detectada")
+                    runtime_v2.evento("presence.detected")
                     registrar_evento("inicio_interacao")
+                    runtime_v2.iniciar_sessao()
                     dialogo.mostrar(
-                        SAUDACAO["mensagem"],
+                        conteudo.saudacao["mensagem"],
                         aguardando=True,
-                        complemento=SAUDACAO["cta"],
+                        complemento=conteudo.saudacao["cta"],
                     )
                 continue
 
@@ -306,14 +327,18 @@ def main():
                     and controle["frames_joinha"] >= JOINHA_FRAMES_CONFIRMAR
                 ):
                     registrar_evento("joinha_inicial", confirmar_frames=JOINHA_FRAMES_CONFIRMAR)
+                    runtime_v2.evento(
+                        "gesture.confirmed",
+                        {"gesture": "thumbs_up", "confirm_frames": JOINHA_FRAMES_CONFIRMAR},
+                    )
                     estado = Estado.CONFIRMACAO_JOINHA
                     inicio_confirmacao_joinha = agora
                     dialogo.mostrar("Joinha reconhecido", aguardando=False, confirmado=True)
                 else:
                     dialogo.mostrar(
-                        SAUDACAO["mensagem"],
+                        conteudo.saudacao["mensagem"],
                         aguardando=True,
-                        complemento=SAUDACAO["cta"],
+                        complemento=conteudo.saudacao["cta"],
                         indicador=indicador_joinha(controle),
                         debug_camera=dados_debug_camera(frame, gesto, controle, estado),
                     )
@@ -325,15 +350,15 @@ def main():
                     estado = Estado.ESCOLHA_TEMA
                     bloquear_respostas(controle, agora)
                     dialogo.mostrar_pergunta(
-                        ESCOLHA_TEMA["pergunta"],
-                        ESCOLHA_TEMA["alternativas"],
+                        conteudo.escolha_tema["pergunta"],
+                        conteudo.escolha_tema["alternativas"],
                         aguardando=True,
                     )
                 continue
 
             if estado in (Estado.ESCOLHA_TEMA, Estado.PERGUNTA):
                 if estado == Estado.ESCOLHA_TEMA:
-                    etapa = ESCOLHA_TEMA
+                    etapa = conteudo.escolha_tema
                     titulo = None
                 else:
                     etapa = pergunta_atual
@@ -365,7 +390,7 @@ def main():
                 numero = controle["numero_candidato"]
                 bloquear_respostas(controle, agora)
                 if estado == Estado.ESCOLHA_TEMA:
-                    tema = tema_por_numero(numero)
+                    tema = conteudo.tema_por_numero(numero)
                     indice_pergunta = 0
                     pergunta_atual = tema["perguntas"][indice_pergunta]
                     inicio_pergunta = agora
@@ -375,15 +400,17 @@ def main():
                         numero=numero,
                         tema=tema["id"],
                     )
+                    runtime_v2.tema_selecionado(tema["id"], numero)
                     registrar_evento(
                         "pergunta_exibida",
                         pergunta=pergunta_atual["id"],
                         tema=tema["id"],
                     )
+                    runtime_v2.pergunta_exibida(pergunta_atual["id"], tema["id"])
                     continue
 
                 resposta_atual = numero
-                feedback_atual = feedback_da_resposta(pergunta_atual, numero)
+                feedback_atual = conteudo.feedback_da_resposta(pergunta_atual, numero)
                 inicio_feedback = agora
                 tempo_resposta = agora - inicio_pergunta
                 estado = Estado.FEEDBACK
@@ -396,6 +423,12 @@ def main():
                     correta=feedback_atual["correta"],
                     tempo_segundos=round(tempo_resposta, 1),
                     confirmar_frames=RESPOSTA_FRAMES_CONFIRMAR,
+                )
+                runtime_v2.resposta_registrada(
+                    pergunta_atual["id"],
+                    numero,
+                    tempo_resposta,
+                    feedback_atual["correta"],
                 )
                 dialogo.mostrar_pergunta(
                     pergunta_atual["pergunta"],
@@ -441,20 +474,24 @@ def main():
                         pergunta=pergunta_atual["id"],
                         tema=tema["id"],
                     )
+                    runtime_v2.pergunta_exibida(pergunta_atual["id"], tema["id"])
                 else:
                     estado = Estado.ENCERRAMENTO
                     inicio_encerramento = agora
-                    dialogo.mostrar(ENCERRAMENTO["mensagem"], aguardando=False)
+                    dialogo.mostrar(conteudo.encerramento["mensagem"], aguardando=False)
                 continue
 
             if estado == Estado.ENCERRAMENTO:
-                dialogo.mostrar(ENCERRAMENTO["mensagem"], aguardando=False)
-                if agora - inicio_encerramento >= ENCERRAMENTO["duracao"]:
+                dialogo.mostrar(conteudo.encerramento["mensagem"], aguardando=False)
+                if agora - inicio_encerramento >= conteudo.encerramento["duracao"]:
                     duracao = agora - inicio_interacao
                     registrar_evento(
                         "interacao_concluida",
                         tema=tema["id"],
                         duracao_segundos=round(duracao, 1),
+                    )
+                    runtime_v2.encerrar_sessao(
+                        "completed", {"duration_seconds": round(duracao, 1)}
                     )
                     estado = Estado.ESPERA
                     controle = novo_controle_gestos()
@@ -477,6 +514,9 @@ def main():
             gestos.close()
         if pessoa is not None:
             pessoa.close()
+        if control_server is not None:
+            control_server.stop()
+        runtime_v2.evento("runtime.stopped")
         registrar_evento("totem_encerrado")
 
 
