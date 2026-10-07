@@ -1,0 +1,20 @@
+# Ambientes e caches Python
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# Dados mutaveis produzidos no Raspberry
+*.db
+*.sqlite
+*.sqlite3
+logs/
+runtime/
+tmp/
+
+# Arquivos locais de configuracao e segredos operacionais
+.env
+.env.*
+!.env.example
