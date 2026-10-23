@@ -1,0 +1,5 @@
+-r base.txt
+-r test.txt
+# Pygame vem de python3-pygame para preservar os drivers SDL/KMS do Debian.
+numpy==2.4.6
+mediapipe==1.1.1

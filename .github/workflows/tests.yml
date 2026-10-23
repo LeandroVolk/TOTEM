@@ -1,0 +1,24 @@
+name: testes
+
+on:
+  push:
+    branches: [main, reorganizacao-fedora-producao]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  testes-sem-hardware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+      - run: python -m pip install -r requirements/dev.txt
+      - run: SDL_VIDEODRIVER=dummy TOTEM_HEADLESS=1 python -m pytest -q
+      - run: bash -n totem.sh run_totem.sh run_admin.sh deploy.sh install_v2_services.sh
+      - run: python totem.py --simulate --headless --script examples/simulation-full.txt
