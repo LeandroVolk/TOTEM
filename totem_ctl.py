@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Operacao por SSH usando o mesmo IPC e controle restrito do Admin."""
+"""Compatibilidade de operacao usando o mesmo IPC e controle do TOTEM."""
 
 import argparse
 import subprocess

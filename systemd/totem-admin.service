@@ -1,5 +1,5 @@
 [Unit]
-Description=Totem LABECO administracao local
+Description=TOTEM - administracao local
 After=network-online.target
 Wants=network-online.target
 
@@ -7,10 +7,10 @@ Wants=network-online.target
 Type=simple
 User=__USER__
 WorkingDirectory=__PROJECT_DIR__
-StateDirectory=totem-labeco
-EnvironmentFile=-/etc/totem-labeco/admin.env
-Environment=TOTEM_RUNTIME_DIR=/var/lib/totem-labeco
-Environment=TOTEM_CONTROL_SOCKET=/var/lib/totem-labeco/control.sock
+StateDirectory=totem
+LogsDirectory=totem
+EnvironmentFile=-/etc/totem/totem.env
+EnvironmentFile=-/etc/totem/admin.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart=__PROJECT_DIR__/run_admin.sh
 Restart=on-failure

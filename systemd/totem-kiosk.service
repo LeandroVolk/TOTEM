@@ -1,20 +1,27 @@
 [Unit]
-Description=Totem LABECO kiosk publico
-After=network-online.target
-Wants=network-online.target
+Description=TOTEM - interface publica dedicada
+After=systemd-user-sessions.service sound.target
+Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
 User=__USER__
 WorkingDirectory=__PROJECT_DIR__
-StateDirectory=totem-labeco
-Environment=TOTEM_RUNTIME_DIR=/var/lib/totem-labeco
-Environment=TOTEM_CONTROL_SOCKET=/var/lib/totem-labeco/control.sock
-Environment=PYTHONUNBUFFERED=1
+StateDirectory=totem
+LogsDirectory=totem
+EnvironmentFile=-/etc/totem/totem.env
+Environment=SDL_VIDEODRIVER=kmsdrm
 SupplementaryGroups=video render input tty
 ExecStart=__PROJECT_DIR__/run_totem.sh
 Restart=on-failure
 RestartSec=3
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target

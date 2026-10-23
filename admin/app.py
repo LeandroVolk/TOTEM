@@ -55,7 +55,7 @@ class ServicosAdmin:
 
 
 def create_app(servicos=None, token=ADMIN_TOKEN):
-    app = FastAPI(title="Totem LABECO Admin", docs_url=None, redoc_url=None)
+    app = FastAPI(title="TOTEM Admin", docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "admin" / "static")), name="static")
     servicos = servicos or ServicosAdmin()
 
