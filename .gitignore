@@ -18,3 +18,10 @@ tmp/
 .env
 .env.*
 !.env.example
+
+# Configuracao local e artefatos de operacao/desenvolvimento
+config/local.toml
+backups/
+.totem.pid
+.coverage
+htmlcov/

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from threading import RLock
 from time import monotonic
 
@@ -14,7 +15,10 @@ from v2_config import CONTENT_ROOT, DATABASE_PATH, preparar_diretorios
 
 class RuntimeV2:
     def __init__(self, database_path=DATABASE_PATH, content_root=CONTENT_ROOT):
-        preparar_diretorios()
+        database_path = Path(database_path)
+        content_root = Path(content_root)
+        database_path.parent.mkdir(parents=True, exist_ok=True)
+        content_root.mkdir(parents=True, exist_ok=True)
         self.database = Database(database_path)
         self.database.migrate()
         self.repositorio = RepositorioTotem(self.database)

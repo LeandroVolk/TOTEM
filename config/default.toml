@@ -1,0 +1,41 @@
+# Padroes versionados. Para ajustes locais, copie como config/local.toml e use
+# TOTEM_CONFIG=config/local.toml. O arquivo local nao e versionado.
+
+[execution]
+mode = "hardware"
+fullscreen = true
+headless = false
+volume = 1.0
+log_level = "INFO"
+
+[screen]
+screen_width = 0
+screen_height = 0
+
+[camera]
+camera_device = "/dev/video0"
+camera_width = 320
+camera_height = 240
+camera_fps = 5
+pose_interval_frames = 2
+
+[recognition]
+pose_min_confidence = 0.5
+hand_min_detection_confidence = 0.4
+hand_min_presence_confidence = 0.4
+hand_min_tracking_confidence = 0.4
+thumbs_up_confirm_seconds = 0.8
+answer_confirm_seconds = 0.6
+answer_release_seconds = 0.5
+
+[timers]
+absence_seconds = 15.0
+inactivity_seconds = 90.0
+answer_highlight_seconds = 2.0
+thumbs_up_feedback_seconds = 2.0
+feedback_seconds = 6.0
+
+[admin]
+admin_host = "127.0.0.1"
+admin_port = 8787
+admin_enabled = true

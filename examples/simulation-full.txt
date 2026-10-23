@@ -1,0 +1,18 @@
+# Fluxo completo acelerado, sem camera, monitor ou espera real.
+enter
+thumbs-up
+next
+next
+fingers 1
+next
+correct
+next
+next
+correct
+next
+next
+correct
+next
+next
+status
+quit
