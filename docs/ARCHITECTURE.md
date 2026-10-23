@@ -1,15 +1,63 @@
-# Arquitetura V2
+# Arquitetura do TOTEM
 
-O Totem possui ciclos de vida independentes:
+## Princípios
+
+- A regra de interação não depende de Pygame, câmera ou MediaPipe.
+- Hardware e simulador produzem os mesmos eventos.
+- O Runtime público continua funcionando sem Admin ou rede.
+- Configuração, código, conteúdo publicado e dados operacionais têm ciclos de
+  vida separados.
+- Falhas de telemetria não derrubam a experiência pública.
+
+## Fluxo
 
 ```text
-HARDWARE: Raspberry Pi, camera, HDMI/KMSDRM
-SOFTWARE: runtime Python, MediaPipe, Pygame
-CONTEUDO: bundles versionados, ativos por symlink
+┌────────────────────┐       ┌────────────────────┐
+│ ffmpeg + MediaPipe │       │ SimulationCommands │
+└─────────┬──────────┘       └──────────┬─────────┘
+          └────────── Evento ───────────┘
+                         │
+                  ┌──────▼──────┐
+                  │ TotemEngine │
+                  └───┬─────┬───┘
+                      │     │
+           ┌──────────▼─┐ ┌─▼─────────────────┐
+           │ Presenter  │ │ RuntimeV2         │
+           │ Pygame     │ │ SQLite + conteúdo │
+           └────────────┘ └─────────┬─────────┘
+                                    │ AF_UNIX JSON
+                              ┌─────▼──────┐
+                              │ FastAPI    │
+                              │ Admin      │
+                              └────────────┘
 ```
 
-`totem.py` continua dono exclusivo de camera, MediaPipe e Pygame. `runtime_v2.py` acrescenta persistência e conteúdo sem importar módulos gráficos. Se a inicialização V2 falhar, `RuntimeV2Nulo` mantém o roteiro legado disponível.
+`TotemEngine` possui os estados `ESPERA`, `SAUDACAO`,
+`CONFIRMACAO_JOINHA`, `ESCOLHA_TEMA`, `PERGUNTA`, `FEEDBACK` e
+`ENCERRAMENTO`. Confirmações e transições usam relógio monotônico. A máquina
+aceita gestos 1–5; o bundle atual limita alternativas públicas a 1 e 2.
 
-O Admin é outro processo. Ele consulta status e solicita reload por `AF_UNIX`, no socket configurado por `TOTEM_CONTROL_SOCKET`. O protocolo é JSON delimitado por linha e aceita somente `status` e `reload_content`. Não existe porta HTTP no kiosk.
+## Configuração
 
-O Admin pede operações de serviço por `/usr/local/sbin/totem-kiosk-control`, instalado como root mas limitado a `start`, `stop` e `restart` de `totem-kiosk.service`. O processo FastAPI continua como `labeco` e não recebe acesso root genérico.
+`totem_app/settings.py` carrega `config/default.toml`, um arquivo indicado por
+`TOTEM_CONFIG` e variáveis de ambiente. As constantes antigas de `config.py`
+continuam como adaptador para componentes gráficos e detectores preservados.
+
+## Persistência e conteúdo
+
+SQLite guarda sessões e eventos, nunca frames. Bundles vivem em
+`CONTENT_ROOT/bundles`; `current` é um symlink trocado atomicamente. O roteiro
+Python legado continua como fallback e fonte do bundle inicial.
+
+## Administração e privilégios
+
+Admin e kiosk são processos distintos. O Admin consulta o runtime por socket
+Unix e só controla ações fixas por helper/sudoers. Nenhum processo Python roda
+como root. O instalador eleva privilégio somente para pacotes, `/etc`, diretórios
+de estado e unidades systemd.
+
+## Componentes legados
+
+`movimento.py`, `reprodutor_video.py` e vídeos anteriores são mantidos como
+referência, mas não participam do fluxo principal. `deploy.sh` permanece apenas
+como aviso de migração; o código original está na tag preservada.

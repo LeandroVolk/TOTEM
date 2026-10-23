@@ -1,60 +1,101 @@
-# Implantação no Raspberry Pi 5
+# Produção no Raspberry Pi 5
 
-## Dependências V2
+Alvo: Raspberry Pi 5 ARM64, Debian 13, Python 3.13, Logitech C270, monitor HDMI
+e execução dedicada no console `tty1`.
 
-No Raspberry, depois de sincronizar o projeto, instale as dependências administrativas no mesmo ambiente virtual que já contém MediaPipe:
+## Instalação limpa
 
-```bash
-cd ~/totem
-source .venv/bin/activate
-pip install --no-cache-dir -r requirements-v2.txt
-chmod +x run_admin.sh install_v2_services.sh totem_ctl.py
-```
-
-## Serviços
-
-O diagnóstico anterior confirmou que `labeco` pertence aos grupos `video`, `render` e `input`; as unidades systemd mantêm esses grupos suplementares para preservar acesso a KMSDRM e `/dev/video0`.
+Instale uma tag estável, nunca uma branch de trabalho:
 
 ```bash
-cd ~/totem
-./install_v2_services.sh
-sudoedit /etc/totem-labeco/admin.env
+git clone git@github.com:LeandroVolk/TOTEM.git
+cd TOTEM
+git switch --detach vX.Y.Z
+./totem.sh install
 ```
 
-Defina ao menos:
+O instalador:
+
+1. valida Debian/ARM64;
+2. instala Python, venv, ffmpeg, Pygame/SDL, V4L2 e utilitários;
+3. instala dependências Python fixadas, inclusive o wheel ARM64 do MediaPipe;
+4. preserva `/etc/totem` e `/var/lib/totem` em repetições;
+5. instala kiosk/Admin e o helper de operação restrito;
+6. habilita inicialização automática sem iniciar Python como root;
+7. executa diagnóstico final.
+
+## Configuração
+
+Edite `/etc/totem/totem.toml` para câmera, limiares e tempos. Para habilitar o
+Admin na LAN:
+
+```bash
+sudoedit /etc/totem/admin.env
+```
 
 ```text
 TOTEM_ADMIN_HOST=0.0.0.0
 TOTEM_ADMIN_PORT=8787
-TOTEM_ADMIN_TOKEN=cole-um-token-longo-gerado-com-secrets.token_urlsafe
+TOTEM_ADMIN_TOKEN=um-token-longo-gerado-com-secrets
 ```
 
-Depois inicie e acompanhe:
+Mantenha o bind em `127.0.0.1` se o acesso remoto não for necessário.
+
+## Validação física obrigatória
 
 ```bash
-sudo systemctl start totem-kiosk.service totem-admin.service
-sudo systemctl status totem-kiosk.service totem-admin.service
-sudo journalctl -u totem-kiosk.service -u totem-admin.service -f
+./totem.sh doctor --strict-hardware
+./totem.sh restart
+./totem.sh status
+./totem.sh logs
 ```
 
-Operação por SSH:
+Confirme no equipamento:
+
+1. câmera e reconhecimento de pose/mão;
+2. KMSDRM em tela cheia no HDMI;
+3. áudio, quando usado pelo conteúdo;
+4. fluxo público completo e abandono;
+5. reinício após falha e após reboot;
+6. Admin, métricas e operações na LAN;
+7. funcionamento do kiosk com Admin e rede parados.
+
+As unidades entram pelo `graphical.target`, ocupam `/dev/tty1`, usam
+`SDL_VIDEODRIVER=kmsdrm` e recebem grupos suplementares `video`, `render`,
+`input` e `tty`. Se a imagem Debian adotada usar uma sessão gráfica diferente,
+valide e ajuste essa integração antes de publicar a versão de produção.
+
+## Atualização
 
 ```bash
-cd ~/totem
-./totem_ctl.py status
-./totem_ctl.py restart
-./totem_ctl.py reload-content
-./totem_ctl.py logs-kiosk
-./totem_ctl.py camera-check
+./totem.sh update vX.Y.Z
 ```
 
-O Admin estará em `http://IP_DO_RASPBERRY:8787`. Para parar/iniciar o kiosk use `totem-ctl.py stop` e `totem-ctl.py start`; o Admin continua independente.
+O comando requer tag explícita, recusa alterações no checkout, cria backup,
+atualiza dependências e reinstala unidades. Nunca usa force-push.
 
-## Validação
+## Backup e recuperação
 
-1. Faça o fluxo público completo no HDMI.
-2. Execute `totem-ctl.py status` e confirme estado, conteúdo e sessão.
-3. Consulte `/api/metrics` e `/api/events` com o token configurado.
-4. Crie/valide/publique um draft pela API; ative o bundle e confirme `reload-content` somente em `ESPERA`.
-5. Ative um bundle anterior para testar rollback.
-6. Pare `totem-admin.service`: o kiosk deve continuar a experiência atual sem rede ou Admin.
+Exporte para mídia fora do cartão do Raspberry:
+
+```bash
+./totem.sh backup /media/usb/totem-$(date +%F).tar.gz
+```
+
+Em uma reinstalação: instale a mesma tag com `totem.sh install`, conecte a mídia
+e restaure:
+
+```bash
+./totem.sh restore /media/usb/totem-AAAA-MM-DD.tar.gz
+./totem.sh doctor --strict-hardware
+./totem.sh restart
+```
+
+O restore valida caminhos/manifesto e cria backup pré-restauração em produção.
+
+## Estado da compatibilidade
+
+- MediaPipe 1.1.1 declara Python 3.13/3.14 e publica wheels manylinux ARM64.
+- Debian 13 fornece Pygame 2.6.1 ARM64; ele é usado para manter SDL/KMS nativo.
+- A suíte CI e o Fedora não substituem o teste físico de wheel, câmera, KMSDRM,
+  permissões, áudio e systemd no Raspberry.
